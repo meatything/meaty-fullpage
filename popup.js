@@ -33,24 +33,46 @@ captureBtn.addEventListener("click", async () => {
   }
 });
 
-async function stitchAndDownload({ images, totalHeight, viewportHeight }) {
+async function stitchAndDownload({ images, totalHeight, viewportHeight, devicePixelRatio }) {
+  // Load first image to get actual pixel dimensions
   const firstImg = await loadImage(images[0].dataUrl);
-  const width = firstImg.width;
-  const scale = firstImg.height / viewportHeight;
-  const height = Math.ceil(totalHeight * scale);
+  const imgWidth = firstImg.width;
+  const imgHeight = firstImg.height;
 
+  // Calculate scale (captured image pixels per CSS pixel)
+  const scale = imgHeight / viewportHeight;
+
+  // Create canvas for full page
+  const canvasHeight = Math.round(totalHeight * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = imgWidth;
+  canvas.height = canvasHeight;
   const ctx = canvas.getContext("2d");
 
-  for (const img of images) {
-    const image = await loadImage(img.dataUrl);
-    const y = Math.round(img.y * scale);
-    const drawHeight = Math.round(img.height * scale);
-    ctx.drawImage(image, 0, 0, width, drawHeight, 0, y, width, drawHeight);
+  // Draw each captured image
+  for (let i = 0; i < images.length; i++) {
+    const imgData = images[i];
+    const img = await loadImage(imgData.dataUrl);
+
+    const destY = Math.round(imgData.scrollY * scale);
+
+    if (imgData.isLast) {
+      // Last image: only draw the portion we need (from bottom of image)
+      const neededHeight = Math.round(imgData.captureHeight * scale);
+      const srcY = img.height - neededHeight;
+
+      ctx.drawImage(
+        img,
+        0, srcY, img.width, neededHeight,  // source
+        0, destY, img.width, neededHeight   // destination
+      );
+    } else {
+      // Full viewport capture - draw entire image
+      ctx.drawImage(img, 0, destY);
+    }
   }
 
+  // Download
   const link = document.createElement("a");
   link.download = `fullpage-${Date.now()}.png`;
   link.href = canvas.toDataURL("image/png");

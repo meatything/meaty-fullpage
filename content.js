@@ -6,40 +6,64 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function captureFullPage() {
-  const { scrollHeight, clientHeight } = document.documentElement;
   const originalScrollY = window.scrollY;
-  const images = [];
+  const originalOverflow = document.documentElement.style.overflow;
 
   // Hide scrollbars during capture
-  const originalOverflow = document.documentElement.style.overflow;
   document.documentElement.style.overflow = "hidden";
 
-  let currentY = 0;
+  // Get dimensions after hiding scrollbar
+  await delay(50);
+  const scrollHeight = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight
+  );
+  const viewportHeight = window.innerHeight;
+  const devicePixelRatio = window.devicePixelRatio || 1;
 
-  while (currentY < scrollHeight) {
-    window.scrollTo(0, currentY);
-    await delay(150);
+  const images = [];
+  let scrollY = 0;
 
+  // Scroll to top first
+  window.scrollTo(0, 0);
+  await delay(100);
+
+  while (scrollY < scrollHeight) {
     const response = await captureViewport();
     if (response.error) {
       console.error("Capture error:", response.error);
       break;
     }
 
+    const isLastCapture = scrollY + viewportHeight >= scrollHeight;
+    const captureHeight = isLastCapture ? (scrollHeight - scrollY) : viewportHeight;
+
     images.push({
       dataUrl: response.dataUrl,
-      y: currentY,
-      height: Math.min(clientHeight, scrollHeight - currentY)
+      scrollY: scrollY,
+      captureHeight: captureHeight,
+      isLast: isLastCapture
     });
 
-    currentY += clientHeight;
+    if (!isLastCapture) {
+      scrollY += viewportHeight;
+      window.scrollTo(0, scrollY);
+      await delay(150);
+    } else {
+      break;
+    }
   }
 
   // Restore original state
   document.documentElement.style.overflow = originalOverflow;
   window.scrollTo(0, originalScrollY);
 
-  return { images, totalHeight: scrollHeight, viewportHeight: clientHeight };
+  return {
+    images,
+    totalHeight: scrollHeight,
+    viewportHeight: viewportHeight,
+    devicePixelRatio: devicePixelRatio
+  };
 }
 
 function captureViewport() {
