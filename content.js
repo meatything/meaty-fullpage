@@ -18,26 +18,11 @@ async function captureFullPage() {
   document.documentElement.style.overflow = "hidden";
   document.body.style.scrollBehavior = "auto";
 
-  // Scroll to top first and wait for any lazy content
+  // Scroll to top first
   window.scrollTo(0, 0);
   await delay(300);
 
-  // Find and track fixed/sticky elements
-  const fixedElements = findFixedElements();
-  const originalStyles = new Map();
-
-  // Store original styles
-  fixedElements.forEach(el => {
-    originalStyles.set(el, {
-      visibility: el.style.visibility,
-      position: el.style.position
-    });
-  });
-
-  // Get dimensions after settling
   const viewportHeight = window.innerHeight;
-
-  // Get full scroll height
   const scrollHeight = Math.max(
     document.body.scrollHeight,
     document.body.offsetHeight,
@@ -45,35 +30,40 @@ async function captureFullPage() {
     document.documentElement.offsetHeight
   );
 
-  console.log("Capture params:", { viewportHeight, scrollHeight, fixedElements: fixedElements.length });
-
   const images = [];
   const numCaptures = Math.ceil(scrollHeight / viewportHeight);
+  const hiddenElements = [];
+
+  console.log("Capture params:", { viewportHeight, scrollHeight, numCaptures });
 
   for (let i = 0; i < numCaptures; i++) {
-    // Hide fixed elements before second capture (first capture keeps header)
-    if (i === 1) {
-      fixedElements.forEach(el => {
-        el.style.visibility = "hidden";
-      });
-      await delay(50);
-    }
-
     const scrollY = i * viewportHeight;
-
-    // Don't scroll past the maximum
     const actualScrollY = Math.min(scrollY, scrollHeight - viewportHeight);
+
     window.scrollTo(0, actualScrollY);
     await delay(150);
 
+    // After first capture, find and hide ALL fixed/sticky elements
+    if (i === 1) {
+      const fixed = findFixedElements();
+      console.log("Found fixed elements:", fixed.length);
+
+      fixed.forEach(el => {
+        // Store original display
+        hiddenElements.push({ el, display: el.style.display });
+        // Use display:none to completely remove from layout
+        el.style.setProperty("display", "none", "important");
+      });
+      await delay(100);
+    }
+
     const response = await captureViewport();
     if (response.error) {
-      console.error("Capture error at scroll", scrollY, ":", response.error);
+      console.error("Capture error:", response.error);
       continue;
     }
 
     const isLast = (i === numCaptures - 1);
-
     let yOffset = 0;
     if (isLast && actualScrollY !== scrollY) {
       yOffset = scrollY - actualScrollY;
@@ -87,15 +77,12 @@ async function captureFullPage() {
       isLast: isLast
     });
 
-    console.log(`Captured ${i + 1}/${numCaptures} at scrollY=${actualScrollY}`);
+    console.log(`Captured ${i + 1}/${numCaptures}`);
   }
 
-  // Restore fixed elements
-  fixedElements.forEach(el => {
-    const orig = originalStyles.get(el);
-    if (orig) {
-      el.style.visibility = orig.visibility;
-    }
+  // Restore hidden elements
+  hiddenElements.forEach(({ el, display }) => {
+    el.style.display = display;
   });
 
   // Restore original state
@@ -119,11 +106,14 @@ function findFixedElements() {
   for (const el of all) {
     const style = window.getComputedStyle(el);
     const position = style.position;
-    const rect = el.getBoundingClientRect();
 
-    // Find elements that are fixed or sticky and near the top
-    if ((position === "fixed" || position === "sticky") && rect.top < 100 && rect.height > 20) {
-      fixed.push(el);
+    if (position === "fixed" || position === "sticky") {
+      const rect = el.getBoundingClientRect();
+      // Elements at top of viewport (headers, nav bars, banners)
+      if (rect.top < 200 && rect.height > 10 && rect.width > 100) {
+        fixed.push(el);
+        console.log("Fixed element:", el.tagName, el.className, rect.top, rect.height);
+      }
     }
   }
 
