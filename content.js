@@ -51,20 +51,20 @@ async function captureFullPage() {
   const numCaptures = Math.ceil(scrollHeight / viewportHeight);
 
   for (let i = 0; i < numCaptures; i++) {
-    const scrollY = i * viewportHeight;
-
-    // Don't scroll past the maximum
-    const actualScrollY = Math.min(scrollY, scrollHeight - viewportHeight);
-    window.scrollTo(0, actualScrollY);
-    await delay(150);
-
-    // After first capture, hide fixed elements
+    // Hide fixed elements before second capture (first capture keeps header)
     if (i === 1) {
       fixedElements.forEach(el => {
         el.style.visibility = "hidden";
       });
       await delay(50);
     }
+
+    const scrollY = i * viewportHeight;
+
+    // Don't scroll past the maximum
+    const actualScrollY = Math.min(scrollY, scrollHeight - viewportHeight);
+    window.scrollTo(0, actualScrollY);
+    await delay(150);
 
     const response = await captureViewport();
     if (response.error) {
