@@ -22,9 +22,20 @@ async function captureFullPage() {
   window.scrollTo(0, 0);
   await delay(300);
 
+  // Find and track fixed/sticky elements
+  const fixedElements = findFixedElements();
+  const originalStyles = new Map();
+
+  // Store original styles
+  fixedElements.forEach(el => {
+    originalStyles.set(el, {
+      visibility: el.style.visibility,
+      position: el.style.position
+    });
+  });
+
   // Get dimensions after settling
   const viewportHeight = window.innerHeight;
-  const viewportWidth = window.innerWidth;
 
   // Get full scroll height
   const scrollHeight = Math.max(
@@ -34,7 +45,7 @@ async function captureFullPage() {
     document.documentElement.offsetHeight
   );
 
-  console.log("Capture params:", { viewportHeight, scrollHeight, ratio: scrollHeight / viewportHeight });
+  console.log("Capture params:", { viewportHeight, scrollHeight, fixedElements: fixedElements.length });
 
   const images = [];
   const numCaptures = Math.ceil(scrollHeight / viewportHeight);
@@ -45,10 +56,15 @@ async function captureFullPage() {
     // Don't scroll past the maximum
     const actualScrollY = Math.min(scrollY, scrollHeight - viewportHeight);
     window.scrollTo(0, actualScrollY);
-    await delay(200);
+    await delay(150);
 
-    // Wait for any lazy-loaded content
-    await delay(100);
+    // After first capture, hide fixed elements
+    if (i === 1) {
+      fixedElements.forEach(el => {
+        el.style.visibility = "hidden";
+      });
+      await delay(50);
+    }
 
     const response = await captureViewport();
     if (response.error) {
@@ -58,11 +74,8 @@ async function captureFullPage() {
 
     const isLast = (i === numCaptures - 1);
 
-    // For the last capture, we might have scrolled less than a full viewport
-    // Calculate how much of this capture is "new" content
     let yOffset = 0;
     if (isLast && actualScrollY !== scrollY) {
-      // We couldn't scroll as far as we wanted, so part of this image overlaps
       yOffset = scrollY - actualScrollY;
     }
 
@@ -74,8 +87,16 @@ async function captureFullPage() {
       isLast: isLast
     });
 
-    console.log(`Captured ${i + 1}/${numCaptures} at scrollY=${actualScrollY}, yOffset=${yOffset}`);
+    console.log(`Captured ${i + 1}/${numCaptures} at scrollY=${actualScrollY}`);
   }
+
+  // Restore fixed elements
+  fixedElements.forEach(el => {
+    const orig = originalStyles.get(el);
+    if (orig) {
+      el.style.visibility = orig.visibility;
+    }
+  });
 
   // Restore original state
   document.documentElement.style.overflow = originalOverflow;
@@ -89,6 +110,24 @@ async function captureFullPage() {
     viewportHeight: viewportHeight,
     numCaptures: numCaptures
   };
+}
+
+function findFixedElements() {
+  const fixed = [];
+  const all = document.querySelectorAll("*");
+
+  for (const el of all) {
+    const style = window.getComputedStyle(el);
+    const position = style.position;
+    const rect = el.getBoundingClientRect();
+
+    // Find elements that are fixed or sticky and near the top
+    if ((position === "fixed" || position === "sticky") && rect.top < 100 && rect.height > 20) {
+      fixed.push(el);
+    }
+  }
+
+  return fixed;
 }
 
 function captureViewport() {
