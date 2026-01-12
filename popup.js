@@ -8,6 +8,14 @@ captureBtn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+    // Check for restricted URLs
+    if (tab.url.startsWith("chrome://") ||
+        tab.url.startsWith("chrome-extension://") ||
+        tab.url.startsWith("edge://") ||
+        tab.url.startsWith("about:")) {
+      throw new Error("Cannot capture browser pages");
+    }
+
     // Inject content script if not already loaded
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
