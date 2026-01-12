@@ -8,6 +8,14 @@ captureBtn.addEventListener("click", async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+    // Inject content script if not already loaded
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"]
+    });
+
+    await new Promise(r => setTimeout(r, 100));
+
     const response = await chrome.tabs.sendMessage(tab.id, { action: "takeScreenshot" });
 
     if (!response || !response.images || response.images.length === 0) {
