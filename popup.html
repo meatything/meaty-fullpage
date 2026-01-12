@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 180px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h1 {
+      font-size: 14px;
+      font-weight: 500;
+      margin: 0 0 12px 0;
+    }
+    button {
+      width: 100%;
+      background: #333;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #444;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meaty Fullpage</h1>
+  <button id="captureBtn">Capture</button>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
