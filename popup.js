@@ -30,7 +30,9 @@ captureBtn.addEventListener("click", async () => {
       throw new Error("No images captured");
     }
 
-    status.textContent = "Stitching...";
+    console.log("Received", response.images.length, "images, totalHeight:", response.totalHeight);
+
+    status.textContent = `Stitching ${response.images.length} images...`;
     await stitchAndDownload(response);
     status.textContent = "Done!";
   } catch (error) {
@@ -41,7 +43,7 @@ captureBtn.addEventListener("click", async () => {
   }
 });
 
-async function stitchAndDownload({ images, totalHeight, viewportHeight, devicePixelRatio }) {
+async function stitchAndDownload({ images, totalHeight, viewportHeight }) {
   // Load first image to get actual pixel dimensions
   const firstImg = await loadImage(images[0].dataUrl);
   const imgWidth = firstImg.width;
@@ -57,25 +59,33 @@ async function stitchAndDownload({ images, totalHeight, viewportHeight, devicePi
   canvas.height = canvasHeight;
   const ctx = canvas.getContext("2d");
 
+  console.log("Canvas:", imgWidth, "x", canvasHeight, "scale:", scale);
+
   // Draw each captured image
   for (let i = 0; i < images.length; i++) {
     const imgData = images[i];
     const img = await loadImage(imgData.dataUrl);
 
-    const destY = Math.round(imgData.scrollY * scale);
+    // Calculate destination Y based on index (simple sequential placement)
+    const destY = i * imgHeight;
 
     if (imgData.isLast) {
-      // Last image: only draw the portion we need (from bottom of image)
-      const neededHeight = Math.round(imgData.captureHeight * scale);
-      const srcY = img.height - neededHeight;
+      // Last image: only draw the non-overlapping portion
+      const yOffsetPixels = Math.round(imgData.yOffset * scale);
+      const drawHeight = img.height - yOffsetPixels;
+      const srcY = yOffsetPixels;
+      const actualDestY = canvasHeight - drawHeight;
+
+      console.log(`Image ${i}: last, srcY=${srcY}, destY=${actualDestY}, height=${drawHeight}`);
 
       ctx.drawImage(
         img,
-        0, srcY, img.width, neededHeight,  // source
-        0, destY, img.width, neededHeight   // destination
+        0, srcY, img.width, drawHeight,
+        0, actualDestY, img.width, drawHeight
       );
     } else {
-      // Full viewport capture - draw entire image
+      // Regular capture - draw full image
+      console.log(`Image ${i}: destY=${destY}`);
       ctx.drawImage(img, 0, destY);
     }
   }
